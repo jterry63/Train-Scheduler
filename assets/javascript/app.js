@@ -12,69 +12,84 @@ firebase.initializeApp(config);
 
 var database = firebase.database();
 
-$("#submitTrain").on('click', function () {
+$("#submitTrain").on("click", function (event) {
 
-
-    var trainName = $('#trainName').val().trim();
-    var trainDest = $('#trainDest').val().trim();
-    var trainFirst = $('#trainFirst').val().trim();
-    var trainFreq = $('#trainFreq').val().trim();
     event.preventDefault();
 
-    var newTrain = {
-        trainsName: trainName,
-        destination: trainDest,
-        firstTrain: trainFirst,
-        frequency: trainFreq,
-        timeAdded: firebase.database.ServerValue.TIMESTAMP,
-    };
 
-    database.ref("/Trains").push(newTrain);
+    var trainName = $("#trainName").val().trim();
+    var destination = $("#trainDest").val().trim();
+    var firstTrain = $("#trainFirst").val().trim();
+    var frequency = $("#trainFreq").val().trim();
 
-    // console.log(newTrain.name);
-    // console.log(newTrain.destination);
-    // console.log(newTrain.first);
-    // console.log(newTrain.frequency);
+    if (validateTime(firstTrain)) {
 
-    $("#trainName").val("")
-    $("#trainDest").val("")
-    $("#trainFirst").val("")
-    $("#trainFreq").val("")
+        database.ref("/Trains").push({
+            trainName: trainName,
+            destination: destination,
+            firstTrain: firstTrain,
+            frequency: frequency,
+            dateAdded: firebase.database.ServerValue.TIMESTAMP,
+        });
+
+        $("#trainName").val("");
+        $("#trainDest").val("");
+        $("#trainFirst").val("");
+        $("#trainFreq").val("");
+    }
+
 
 });
 
 database.ref("/Trains").on("child_added", function (childSnapshot) {
+    var frequency = childSnapshot.val().frequency
+    var firstTimeConverted = moment(childSnapshot.val().firstTrain, "HH:mm").subtract(1, "years");
+    var timeDifference = moment().diff(moment(firstTimeConverted), "minutes");
+    var minutesAway = frequency - (timeDifference % frequency);
+    var nextTrain = moment().add(minutesAway, "minutes");
 
-    // console.log(snapshot.val().name);
-    // console.log(snapshot.val().destination);
-    // console.log(snapshot.val().first);
-    // console.log(snapshot.val().frequency);
+    $("#trainTable").append("<tr>" + "<td>" + childSnapshot.val().trainName + "</td>" +
+        "<td>" + childSnapshot.val().destination + "</td>" +
+        "<td>" + childSnapshot.val().frequency + "</td>" +
+        "<td>" + moment(nextTrain).format("hh:mm A") + "</td>" +
+        "<td>" + minutesAway + "</td>" + "</tr>");
 
-    var time = moment(new Date(childSnapshot.val().timeAdded));
-    var freq = childSnapshot.val().frequency
-    var start = parseInt(childSnapshot.val().firstTrain);
-    //===============
 
-    start = moment(start, 'HHmm')
-    var timeDiff = time.diff(start, 'minutes')
-    //============
-
-    // time = time.format("hh mm A");
-    // var timeDiff = time.diff(start, 'minutes')
-    timeDiff = parseInt(timeDiff);
-    var minAway = freq - (timeDiff % freq);
-    var nextTrain = moment(time).add(minAway, 'minutes')
-    nextTrain = nextTrain.format("hh:mm A")
-
-    $('#trainTable').append(
-        "<tr>" +
-        "<td> " + childSnapshot.val().trainsName + " </td>" +
-        "<td> " + childSnapshot.val().destination + " </td>" +
-        "<td> " + childSnapshot.val().frequency + " </td>" +
-        "<td>" + nextTrain + "</td>" +
-        "<td>" + minAway + "</td>" +
-        "<td></td>" +
-
-        "</tr>"
-    )
+}, function (errorObject) {
+    console.log("Errors handled: " + errorObject.code);
 });
+
+function validateTime(obj) {
+    var timeValue = obj;
+    if (timeValue == "" || timeValue.indexOf(":") < 0) {
+        alert("Invalid Time format");
+        return false;
+    }
+    else {
+        var sHours = timeValue.split(':')[0];
+        var sMinutes = timeValue.split(':')[1];
+
+        if (sHours == "" || isNaN(sHours) || parseInt(sHours) > 23) {
+            alert("Invalid Time format");
+            return false;
+        }
+        else if (parseInt(sHours) == 0)
+            sHours = "00";
+        else if (sHours < 10)
+            sHours = "0" + sHours;
+
+        if (sMinutes == "" || isNaN(sMinutes) || parseInt(sMinutes) > 59) {
+            alert("Invalid Time format");
+            return false;
+        }
+        else if (parseInt(sMinutes) == 0)
+            sMinutes = "00";
+        else if (sMinutes < 10)
+            sMinutes = "0" + sMinutes;
+
+        obj = sHours + ":" + sMinutes;
+    }
+
+    return true;
+}
+
